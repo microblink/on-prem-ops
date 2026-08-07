@@ -1,0 +1,117 @@
+auth:
+  license:
+    # Name of the Secret containing LICENSE_KEY and LICENSE_APPLICATION_ID.
+    secretName: microblink-license
+    # Create the Secret from the two values below. Prefer an externally managed
+    # Secret in production so credentials do not enter Helm release values.
+    createSecret: false
+    licenseKey: ""
+    applicationId: ""
+
+blinkIdVerify:
+  enabled: true
+  replicaCount: 1
+  nameOverride: blinkid-verify
+  fullnameOverride: ""
+
+  image:
+    repository: us-docker.pkg.dev/document-verification-public/on-prem/core
+    pullPolicy: IfNotPresent
+    # An empty tag uses Chart.appVersion.
+    tag: ""
+    pullSecrets: []
+
+  service:
+    type: ClusterIP
+    port: 8080
+
+  serviceAccount:
+    # The container does not call the Kubernetes API. Enable this only when
+    # organizational policy requires a dedicated ServiceAccount.
+    create: false
+    name: ""
+    annotations: {}
+
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+
+  ingress:
+    enabled: false
+    className: ""
+    annotations: {}
+    tls: []
+    hosts:
+      - host: verify.example.com
+        paths:
+          - /
+    pathType: Prefix
+
+  # Supported customer configuration. See docs/environment-variables.md.
+  env:
+    DOCVER_WORKFLOW: ExtractAndVerify
+    WORKER_COUNT: "2"
+    MicroblinkInflightLimit: "2"
+    # The image defaults to 0. The chart uses 1 to absorb a short routing burst.
+    MicroblinkQueueLimit: "1"
+
+  logFiles:
+    enabled: false
+
+  # Additional supported environment variables as name/value pairs.
+  extraEnv: []
+  # Secret names whose keys should be added to the container environment.
+  extraSecrets: []
+
+  probes:
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 60
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 5
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 30
+      periodSeconds: 15
+      timeoutSeconds: 5
+      failureThreshold: 10
+    startup:
+      enabled: true
+      path: /health/ready
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 60
+
+  terminationGracePeriodSeconds: 30
+  nodeSelector:
+    kubernetes.io/arch: amd64
+  tolerations: []
+  podAnnotations: {}
+  affinity: {}
+  topologySpreadConstraints: []
+  podSecurityContext:
+    fsGroup: 65534
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    runAsGroup: 65534
+    runAsUser: 65534
+    seccompProfile:
+      type: RuntimeDefault
+
+  volumes:
+    tmp:
+      sizeLimit: ""
+    varTmp:
+      sizeLimit: ""
+    varLog:
+      sizeLimit: ""

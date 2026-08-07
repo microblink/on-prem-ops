@@ -1,0 +1,10 @@
+apiVersion: v2
+name: blinkid-verify
+description: BlinkID Verify self-hosted single-image deployment
+type: application
+version: 1.1.0
+appVersion: "4000.1.0"
+kubeVersion: ">=1.19.0-0"
+home: https://docs.microblink.com/verify
+sources:
+  - https://github.com/microblink/on-prem-ops

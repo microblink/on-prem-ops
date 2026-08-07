@@ -1,0 +1,35 @@
+services:
+  blinkid-verify:
+    image: ${BLINKID_VERIFY_IMAGE:?Set BLINKID_VERIFY_IMAGE}:${BLINKID_VERIFY_IMAGE_TAG:?Set BLINKID_VERIFY_IMAGE_TAG}
+    ports:
+      - "${BLINKID_VERIFY_API_PORT:-8080}:8080"
+    environment:
+      LICENSE_KEY: ${LICENSE_KEY:?Set LICENSE_KEY}
+      LICENSE_APPLICATION_ID: ${LICENSE_APPLICATION_ID:?Set LICENSE_APPLICATION_ID}
+      DOCVER_WORKFLOW: ${DOCVER_WORKFLOW:-ExtractAndVerify}
+      WORKER_COUNT: ${WORKER_COUNT:-2}
+      MicroblinkInflightLimit: ${BLINKID_VERIFY_INFLIGHT_LIMIT:-2}
+      MicroblinkQueueLimit: ${BLINKID_VERIFY_QUEUE_LIMIT:-0}
+      LOG_FILES_ENABLED: ${LOG_FILES_ENABLED:-0}
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "wget",
+          "--quiet",
+          "--output-document=/dev/null",
+          "http://localhost:8080/health/ready",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 90s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "${LIMITS_CPUS:-4}"
+          memory: ${LIMITS_MEMORY:-8G}
+        reservations:
+          cpus: "${RESERVATIONS_CPUS:-2}"
+          memory: ${RESERVATIONS_MEMORY:-4G}

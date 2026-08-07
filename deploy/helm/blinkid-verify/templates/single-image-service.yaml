@@ -1,0 +1,18 @@
+{{- if .Values.blinkIdVerify.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "blinkidVerify.fullname" . }}
+  labels:
+    {{- include "blinkidVerify.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.blinkIdVerify.service.type }}
+  ports:
+    - name: http
+      port: {{ .Values.blinkIdVerify.service.port }}
+      targetPort: http
+      protocol: TCP
+  selector:
+    app.kubernetes.io/name: {{ include "blinkidVerify.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
