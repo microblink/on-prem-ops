@@ -1,0 +1,142 @@
+{{- if .Values.blinkIdVerify.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "blinkidVerify.fullname" . }}
+  labels:
+    {{- include "blinkidVerify.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.blinkIdVerify.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "blinkidVerify.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "blinkidVerify.labels" . | nindent 8 }}
+      {{- with .Values.blinkIdVerify.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: {{ include "blinkidVerify.serviceAccountName" . }}
+      terminationGracePeriodSeconds: {{ .Values.blinkIdVerify.terminationGracePeriodSeconds }}
+      {{- with .Values.blinkIdVerify.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.blinkIdVerify.podSecurityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: blinkid-verify
+          image: "{{ .Values.blinkIdVerify.image.repository }}:{{ .Values.blinkIdVerify.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.blinkIdVerify.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: var-tmp
+              mountPath: /var/tmp
+            {{- if .Values.blinkIdVerify.logFiles.enabled }}
+            - name: var-log
+              mountPath: /var/log
+            {{- end }}
+          {{- with .Values.blinkIdVerify.containerSecurityContext }}
+          securityContext:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.blinkIdVerify.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          env:
+            {{- range $key, $value := .Values.blinkIdVerify.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            - name: LOG_FILES_ENABLED
+              value: {{ ternary "1" "0" .Values.blinkIdVerify.logFiles.enabled | quote }}
+            {{- range .Values.blinkIdVerify.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ .Values.auth.license.secretName }}
+            {{- range .Values.blinkIdVerify.extraSecrets }}
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.blinkIdVerify.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.blinkIdVerify.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.blinkIdVerify.probes.liveness.periodSeconds }}
+            timeoutSeconds: {{ .Values.blinkIdVerify.probes.liveness.timeoutSeconds }}
+            failureThreshold: {{ .Values.blinkIdVerify.probes.liveness.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.blinkIdVerify.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.blinkIdVerify.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.blinkIdVerify.probes.readiness.periodSeconds }}
+            timeoutSeconds: {{ .Values.blinkIdVerify.probes.readiness.timeoutSeconds }}
+            failureThreshold: {{ .Values.blinkIdVerify.probes.readiness.failureThreshold }}
+          {{- if .Values.blinkIdVerify.probes.startup.enabled }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.blinkIdVerify.probes.startup.path }}
+              port: http
+            periodSeconds: {{ .Values.blinkIdVerify.probes.startup.periodSeconds }}
+            timeoutSeconds: {{ .Values.blinkIdVerify.probes.startup.timeoutSeconds }}
+            failureThreshold: {{ .Values.blinkIdVerify.probes.startup.failureThreshold }}
+          {{- end }}
+      {{- with .Values.blinkIdVerify.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.blinkIdVerify.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.blinkIdVerify.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.blinkIdVerify.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: tmp
+          {{- if .Values.blinkIdVerify.volumes.tmp.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ .Values.blinkIdVerify.volumes.tmp.sizeLimit }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: var-tmp
+          {{- if .Values.blinkIdVerify.volumes.varTmp.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ .Values.blinkIdVerify.volumes.varTmp.sizeLimit }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.blinkIdVerify.logFiles.enabled }}
+        - name: var-log
+          {{- if .Values.blinkIdVerify.volumes.varLog.sizeLimit }}
+          emptyDir:
+            sizeLimit: {{ .Values.blinkIdVerify.volumes.varLog.sizeLimit }}
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- end }}
+{{- end }}
