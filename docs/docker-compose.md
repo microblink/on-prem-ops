@@ -1,6 +1,6 @@
 # Docker Compose
 
-The Docker Compose deployment runs Microblink Self-Hosted Core as one
+The Docker Compose deployment runs the on-prem API as one
 container containing the API, processing workers, and runtime models.
 
 ## Prerequisites
@@ -8,7 +8,7 @@ container containing the API, processing workers, and runtime models.
 -   Docker 20.10.5 or newer
 -   Docker Compose 2.22.0 or newer
 -   A Linux AMD64 host
--   A [MicroblinkCore license](licensing.md)
+-   A [license](licensing.md)
 -   The image version provided with the product release
 
 ## Compose file

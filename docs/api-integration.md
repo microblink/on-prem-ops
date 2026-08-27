@@ -1,7 +1,7 @@
 # API integration
 
-Microblink Self-Hosted Core exposes the document verification, document
-extraction, and barcode extraction APIs.
+The on-prem API exposes endpoints for document verification, document
+extraction, and barcode extraction.
 
 | Operation             | Endpoint                       |
 | --------------------- | ------------------------------ |
@@ -12,7 +12,7 @@ extraction, and barcode extraction APIs.
 
 The availability of the endpoints also depends on the selected
 [deployment mode](deployment-modes.md) and
-[MicroblinkCore license capability](licensing.md#license-behavior).
+[license capability](licensing.md#license-behavior).
 
 ## Request format
 
@@ -155,6 +155,10 @@ Verification settings belong under:
 
 -   `verification.settings`
 -   `verification.useCase`
+
+See [the docs for configuring
+verification](https://docs.microblink.com/verify/configuration) for more
+detail.
 
 ## Validation errors
 
