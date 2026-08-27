@@ -1,7 +1,8 @@
-# BlinkID Verify Self-Hosted
+# Microblink on-prem API
 
 This repository contains the public documentation and reference deployment
-artifacts for the BlinkID Verify self-hosted image.
+artifacts for the Microblink on-prem API, which includes BlinkID and BlinkID
+Verify.
 
 ## Get started
 
@@ -19,8 +20,7 @@ us-docker.pkg.dev/document-verification-public/on-prem/core:<version>
 
 Use the image version listed in the corresponding product release with the
 chart bundled in the matching documentation revision. Both deployment examples
-require a Linux AMD64 host or node and a MicroblinkCore license key and
-application ID.
+require a Linux AMD64 host or node and a license key and application ID.
 
 ## Repository layout
 
@@ -33,5 +33,8 @@ application ID.
 └── docs/                       Integration and operations documentation
 ```
 
-General product documentation and release notes are available at
-[docs.microblink.com/verify](https://docs.microblink.com/verify).
+General product documentation and release notes are available at:
+
+-   [docs.microblink.com/on-prem](https://docs.microblink.com/on-prem)
+-   [docs.microblink.com/verify](https://docs.microblink.com/verify)
+-   [docs.microblink.com/blinkid](https://docs.microblink.com/blinkid)

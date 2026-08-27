@@ -12,8 +12,8 @@ mode has a different resource profile from extraction with verification; see
 
 ## Instances and workers
 
-Each Microblink Self-Hosted Core instance contains its own API, processing
-workers, and runtime models.
+Each on-prem instance contains its own API, processing workers, and runtime
+models.
 
 -   Add instances or Kubernetes replicas when sustained throughput must
     increase.
@@ -102,7 +102,7 @@ Deployments with large or concentrated bursts can place a gateway and durable
 queue in front of the product, then scale consumers from queue depth or message
 rate with a system such as KEDA. This gives more direct control over sustained
 bursts but adds infrastructure, retry, timeout, and request-correlation
-responsibilities outside Microblink Self-Hosted Core.
+responsibilities outside the Microblink on-prem API.
 
 Keep the [per-instance internal queue](#queueing-and-backpressure) small with
 every strategy. It is intended to smooth brief routing bursts, not to replace

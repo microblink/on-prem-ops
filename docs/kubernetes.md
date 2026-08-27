@@ -1,6 +1,6 @@
 # Kubernetes and Helm
 
-The Helm deployment runs one Microblink Self-Hosted Core container per pod.
+The Helm deployment runs one on-prem API container per pod.
 Each pod contains the API, processing workers, and runtime models.
 
 ## Prerequisites
@@ -9,7 +9,7 @@ Each pod contains the API, processing workers, and runtime models.
 -   `kubectl` configured for the target cluster
 -   At least one Linux AMD64 worker node
 -   Helm 3
--   A [MicroblinkCore license](licensing.md)
+-   A [license](licensing.md)
 -   The image version listed in the product release
 -   The chart bundled in the matching documentation revision
 

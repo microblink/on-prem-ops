@@ -1,7 +1,6 @@
 # Licensing
 
-Microblink Self-Hosted Core requires a valid MicroblinkCore license. The
-runtime reads two values:
+The on-prem API requires a valid license. The runtime reads two values:
 
 -   `LICENSE_KEY`
 -   `LICENSE_APPLICATION_ID`

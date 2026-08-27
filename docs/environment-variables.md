@@ -1,6 +1,6 @@
 # Environment variables
 
-Microblink Self-Hosted Core is configured through container environment
+Microblink on-prem API is configured through container environment
 variables. This reference separates supported deployment settings from the
 variables that wire the components inside the single image together.
 
@@ -38,10 +38,10 @@ be overridden.
 
 ## Required license variables
 
-| Variable                 | Default | Role                                                                                                                                               |
-| ------------------------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LICENSE_KEY`            | None    | MicroblinkCore license key used by every Worker. Keep it in a secret store and do not put it in an image, Compose file, Helm values file, or logs. |
-| `LICENSE_APPLICATION_ID` | None    | Application ID associated with the license. Supply it from the same secret as the license key.                                                     |
+| Variable                 | Default | Role                                                                                                                                |
+| ------------------------ | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `LICENSE_KEY`            | None    | License key used by every Worker. Keep it in a secret store and do not put it in an image, Compose file, Helm values file, or logs. |
+| `LICENSE_APPLICATION_ID` | None    | Application ID associated with the license. Supply it from the same secret as the license key.                                      |
 
 Both values are required. A Worker with missing or invalid license
 configuration does not become ready. License capabilities are checked
