@@ -15,15 +15,14 @@ mode has a different resource profile from extraction with verification; see
 Each on-prem instance contains its own API, processing workers, and runtime
 models.
 
--   Add instances or Kubernetes replicas when sustained throughput must
-    increase.
--   `WORKER_COUNT` controls the number of processing workers inside one
-    instance; see
-    [Workflow and capacity](environment-variables.md#workflow-and-capacity).
--   Increasing `WORKER_COUNT` without assigning the instance enough CPU and
-    memory can reduce performance rather than improve it.
--   Extraction mode generally uses significantly fewer resources because it
-    does not start the server-side verification model service.
+-   Each instance sizes itself. It runs `min(cpu / 2, (memory - 700Mi) / 1000Mi)`
+    processing workers, at least one and at most eight, because each worker holds
+    its own copy of the verification models. `WORKER_COUNT` is accepted and
+    ignored.
+-   Give an instance CPU and memory together. More memory alone adds nothing;
+    more CPU alone adds workers only if the memory is there to hold them.
+-   Add instances or Kubernetes replicas when one instance's allocation is no
+    longer enough.
 
 ## Queueing and backpressure
 
@@ -59,9 +58,47 @@ Evaluate these signals together:
 -   failed readiness or frequent container replacement
 
 The health endpoints and Kubernetes probes are described in
-[Kubernetes and Helm](kubernetes.md#access-the-api). Memory admission behavior
-is described under
-[Memory and request limits](environment-variables.md#memory-and-request-limits).
+[Kubernetes and Helm](kubernetes.md#access-the-api). Overload is shed by the
+admission limiter described under
+[Workflow and capacity](environment-variables.md#workflow-and-capacity); the
+container's memory requirement is a fixed startup cost, covered under
+[Memory limits](environment-variables.md#memory-limits).
+
+## Sizing an instance
+
+The figures below were measured on one instance processing a mixed corpus of
+identity documents through `POST /api/v3/verify`, without returned images. Treat
+them as a starting point and confirm them against your own documents and
+hardware, as described under [Estimating capacity](#estimating-capacity).
+
+| CPU | Memory | Workers | Response time (p95, unsaturated) | Sustained throughput |
+| --- | ------ | ------- | -------------------------------- | -------------------- |
+| 2   | 2Gi    | 1       | ~1.6 s                           | ~0.6 req/s           |
+| 4   | 2Gi    | 1       | ~1.0 s                           | ~1.0 req/s           |
+| 8   | 2Gi    | 1       | ~0.9 s                           | ~1.2 req/s           |
+| 4   | 4Gi    | 2       | ~1.2 s                           | ~1.3 req/s           |
+| 4   | 8Gi    | 2       | ~1.2 s                           | ~1.6 req/s           |
+| 8   | 8Gi    | 4       | ~0.8 s                           | ~2.0 req/s           |
+
+Three things follow from it.
+
+**Memory sets the worker count, and nothing else.** Resident usage is about
+1.6Gi with one worker, 2.6Gi with two and 4.4Gi with four, and it does not grow
+into spare headroom: the same instance used the same memory whether it was given
+2Gi or 8Gi. Memory beyond what the workers need is wasted.
+
+**CPU shortens each request, up to a point.** A single request uses several cores
+for inference, so response time falls from about 1.6 s at 2 CPU to 1.0 s at 4.
+Past roughly four cores a single request runs out of parallel work, and further
+CPU only helps if there are enough workers to use it.
+
+**Throughput comes from workers, response time from CPU.** If requests are being
+rejected, add memory so the instance can run more workers. If each request is too
+slow, add CPU.
+
+`2Gi` is the smallest supported memory limit for the verification workflow. An
+instance given less reports the shortfall and stops at startup rather than
+starting and then rejecting requests.
 
 ## Estimating capacity
 
@@ -74,7 +111,7 @@ Use a representative test workload when estimating capacity:
 -   Confirm the [backpressure behavior](#queueing-and-backpressure) when traffic
     exceeds available capacity.
 
-Use those results to choose instance resources, `WORKER_COUNT`, and the number
+Use those results to choose instance resources and the number
 of instances. Apply them through the
 [Docker Compose resource settings](docker-compose.md#compose-file) or
 [Helm values](kubernetes.md#configure-the-release).

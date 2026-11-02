@@ -77,8 +77,7 @@ blinkIdVerify:
 
     env:
         DOCVER_WORKFLOW: ExtractAndVerify
-        WORKER_COUNT: "2"
-        MicroblinkInflightLimit: "2"
+        MicroblinkInflightLimit: "1"
         MicroblinkQueueLimit: "1"
 ```
 
@@ -220,8 +219,8 @@ helm rollback microblink-self-hosted <revision>
 
 ## Capacity
 
-Set `blinkIdVerify.resources`, `blinkIdVerify.replicaCount`, and `WORKER_COUNT`
-using results from a representative load test. See
+Set `blinkIdVerify.resources` and `blinkIdVerify.replicaCount` using results
+from a representative load test. See
 [Scaling](scaling.md#estimating-capacity) for the supported capacity signals
 and general guidance.
 

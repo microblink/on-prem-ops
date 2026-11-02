@@ -31,20 +31,19 @@ helm upgrade --install microblink-self-hosted \
 
 ## Important values
 
-| Value                                       | Default                      | Role                                              |
-| ------------------------------------------- | ---------------------------- | ------------------------------------------------- |
-| `auth.license.secretName`                   | `microblink-license`         | Existing Secret containing both license keys.     |
-| `auth.license.createSecret`                 | `false`                      | Creates the Secret from Helm values when enabled. |
-| `blinkIdVerify.replicaCount`                | `1`                          | Number of single-image pods.                      |
-| `blinkIdVerify.image.repository`            | Public single-image registry | Container image repository.                       |
-| `blinkIdVerify.image.tag`                   | Chart application version    | Product image version.                            |
-| `blinkIdVerify.resources`                   | 2–4 CPU, 4–8 GiB             | Pod requests and limits.                          |
-| `blinkIdVerify.env.DOCVER_WORKFLOW`         | `ExtractAndVerify`           | Selects verification or extraction-only mode.     |
-| `blinkIdVerify.env.WORKER_COUNT`            | `2`                          | Worker processes per pod.                         |
-| `blinkIdVerify.env.MicroblinkInflightLimit` | `2`                          | Concurrent requests admitted per pod.             |
-| `blinkIdVerify.env.MicroblinkQueueLimit`    | `1`                          | Small per-pod routing-burst queue.                |
-| `blinkIdVerify.logFiles.enabled`            | `false`                      | Mirrors logs to an optional `/var/log` volume.    |
-| `blinkIdVerify.ingress.enabled`             | `false`                      | Creates an Ingress from the configured hosts.     |
+| Value                                       | Default                      | Role                                                                          |
+| ------------------------------------------- | ---------------------------- | ----------------------------------------------------------------------------- |
+| `auth.license.secretName`                   | `microblink-license`         | Existing Secret containing both license keys.                                 |
+| `auth.license.createSecret`                 | `false`                      | Creates the Secret from Helm values when enabled.                             |
+| `blinkIdVerify.replicaCount`                | `1`                          | Number of single-image pods.                                                  |
+| `blinkIdVerify.image.repository`            | Public single-image registry | Container image repository.                                                   |
+| `blinkIdVerify.image.tag`                   | Chart application version    | Product image version.                                                        |
+| `blinkIdVerify.resources`                   | 2–4 CPU, 4–8 GiB             | Pod requests and limits.                                                      |
+| `blinkIdVerify.env.DOCVER_WORKFLOW`         | `ExtractAndVerify`           | Selects verification or extraction-only mode.                                 |
+| `blinkIdVerify.env.MicroblinkInflightLimit` | derived                      | Concurrent requests admitted per pod; one more than the derived Worker count. |
+| `blinkIdVerify.env.MicroblinkQueueLimit`    | `2`                          | Small per-pod routing-burst queue; matches the image default.                 |
+| `blinkIdVerify.logFiles.enabled`            | `false`                      | Mirrors logs to an optional `/var/log` volume.                                |
+| `blinkIdVerify.ingress.enabled`             | `false`                      | Creates an Ingress from the configured hosts.                                 |
 
 Only use `blinkIdVerify.extraEnv` for variables listed in the
 [public environment-variable reference](../../../docs/environment-variables.md).

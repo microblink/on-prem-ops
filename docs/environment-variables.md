@@ -17,17 +17,16 @@ DOCVER_WORKFLOW=ExtractAndVerify
 For a bounded burst queue with explicit admission limits:
 
 ```dotenv
-MicroblinkInflightLimit=2
-MicroblinkQueueLimit=1
-MicroblinkMemoryGuardPercent=95
+MicroblinkInflightLimit=3
+MicroblinkQueueLimit=2
 ```
 
 Use the exact spelling and capitalization shown in this document. The Worker
 and container scripts read several names directly from the Linux environment,
 where names are case-sensitive.
 
-`DOCVER_WORKFLOW` retains its existing name. Capacity, memory-guard, and
-shutdown settings use the `Microblink` names shown below.
+`DOCVER_WORKFLOW` retains its existing name. Capacity and shutdown settings use
+the `Microblink` names shown below.
 
 .NET configuration sections use a double underscore in environment variables.
 For example, the `Logging:LogLevel:Default` configuration key is written as
@@ -50,23 +49,25 @@ separately from the selected workflow; see [Licensing](licensing.md) and
 
 ## Workflow and capacity
 
-| Variable                  | Image default      | Role                                                                                                                                                                                                                    |
-| ------------------------- | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DOCVER_WORKFLOW`         | `ExtractAndVerify` | Selects the runtime mode. `Extract` starts the API and Workers without TensorFlow Serving and disables `/api/v3/verify`. `ExtractAndVerify` also starts the bundled verification models. Any other value stops startup. |
-| `WORKER_COUNT`            | `2`                | Number of Worker processes in the container. It must be a positive integer. It also controls the default request concurrency and the number of Workers required for API readiness.                                      |
-| `MicroblinkInflightLimit` | `WORKER_COUNT`     | Maximum number of document requests admitted concurrently by the shared limiter. The same limit covers the V2 and V3 document endpoints. Non-positive or invalid values fall back to the default.                       |
-| `MicroblinkQueueLimit`    | `0`                | Maximum number of requests waiting for an admission permit. `0` rejects excess requests immediately with HTTP `429`; a small positive value absorbs short bursts at the cost of additional memory and latency.          |
+| Variable                  | Image default      | Role                                                                                                                                                                                                                                                                                                                                                                     |
+| ------------------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DOCVER_WORKFLOW`         | `ExtractAndVerify` | Selects the runtime mode. `Extract` disables `/api/v3/verify` and the checks that need the bundled verification models. `ExtractAndVerify` enables both. Any other value stops startup.                                                                                                                                                                                  |
+| `WORKER_COUNT`            | derived            | Accepted and ignored. The container derives its Worker count from the CPU and memory it is given: `min(cpu / 2, (memory − 700 MiB) / 1000 MiB)`, at least one and at most eight. Each Worker holds its own copy of the verification models, about 1 GiB, which is why memory bounds it. Existing values are accepted so deployments need no editing.                     |
+| `MicroblinkInflightLimit` | derived            | Maximum number of document requests admitted concurrently by the shared limiter, defaulting to one more than the Worker count: each Worker handles one request at a time, and the extra permit lets a request be read while another is being processed. The same limit covers the V2 and V3 document endpoints. Non-positive or invalid values fall back to the default. |
+| `MicroblinkQueueLimit`    | `2`                | Maximum number of requests waiting for an admission permit. `0` rejects excess requests immediately with HTTP `429`; the default of `2` absorbs a short burst, adding at most about two request times of waiting.                                                                                                                                                        |
 
-`WORKER_COUNT` is capacity, not a throughput guarantee. Increasing it gives the
-container more simultaneous processing slots, but each Worker also consumes CPU
-and memory. Size the container and tune the worker count with a representative
-workload as described in [Scaling](scaling.md).
+A container runs one or more Workers, derived from its CPU and memory as described
+above, and each holds its own copy of the verification models. Giving a container
+more CPU without more memory will not add Workers, because memory is the binding
+constraint: measured peak usage is about 1.6 GiB with one Worker, 2.6 GiB with two
+and 4.4 GiB with four. Adding capacity beyond that means adding instances or
+Kubernetes replicas; size each one with a representative workload as described in
+[Scaling](scaling.md).
 
-Keep `MicroblinkQueueLimit` small or `0` in Kubernetes and add replicas for
-sustained load. The image default is `0`; the bundled reference chart sets it
-to `1` to smooth one short routing burst per pod. For durable buffering, place
-a shared queue or gateway in front of multiple instances and scale consumers
-from the external queue. See
+Keep `MicroblinkQueueLimit` small in Kubernetes and add replicas for sustained
+load. The image default is `2`, which smooths a short routing burst per pod. For
+durable buffering, place a shared queue or gateway in front of multiple
+instances and scale consumers from the external queue. See
 [Queueing and backpressure](scaling.md#queueing-and-backpressure) for the
 complete overload strategy.
 
@@ -74,34 +75,18 @@ A larger bounded internal queue can be useful for a single Docker Compose
 instance when callers have sufficiently long timeouts, but it should remain
 small enough to keep overload visible.
 
-## Memory and request limits
+## Memory limits
 
-| Variable                                         | Image default | Role                                                                                                                                                                                                                                  |
-| ------------------------------------------------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `MicroblinkMemoryGuardPercent`                   | `95`          | Starts rejecting document requests with HTTP `429` when current container memory use reaches this percentage of the detected cgroup limit. `0` disables the guard. The guard is also inactive when no finite cgroup limit is visible. |
-| `MicroblinkMemoryGuardReservationFactor`         | `10`          | Multiplies request `Content-Length` to estimate the memory reserved by an admitted request. `0` disables reservation-based admission while leaving the usage threshold active.                                                        |
-| `MicroblinkMemoryGuardUnknownContentLengthBytes` | `20971520`    | Base reservation, in bytes, for a request without `Content-Length`. The reservation factor is applied to this value.                                                                                                                  |
+The container holds one copy of the verification models, so its memory use is
+dominated by a fixed cost paid at startup rather than by per-request work. Set a
+Docker or Kubernetes memory limit that fits that baseline with headroom, and
+confirm it with a representative load test as described in
+[Estimating capacity](scaling.md#estimating-capacity). A container given too
+little memory reports the shortfall at startup and stops, rather than starting
+and then refusing requests.
 
-The percentage threshold and request reservations protect the same admission
-budget; they are not alternatives. The reservation factor does not allocate
-memory. It estimates a request's peak memory cost for admission. A request is
-admitted only when current container memory usage, existing outstanding
-reservations, and the new request reservation fit below the percentage
-threshold.
-
-For example, a 10 GiB container with a 95% threshold has a 9,728 MiB admission
-budget. If current usage is 8,192 MiB and outstanding requests reserve 1,024
-MiB, a 50 MiB request with the default factor reserves another 500 MiB. The
-total is 9,716 MiB, so the request is admitted. Another identical request would exceed
-the threshold and receive HTTP `429`.
-
-The memory guard depends on a container memory limit. Without one, the API
-cannot calculate the percentage threshold. Always set a Docker or Kubernetes
-memory limit in production. Use a representative load test as described in
-[Estimating capacity](scaling.md#estimating-capacity).
-
-The concurrency limiter and memory guard protect all document-processing
-endpoints that share the same in-container Worker pool.
+The concurrency limiter covers all document-processing endpoints that share the
+same in-container Worker.
 
 Caller, ingress, load-balancer, and API timeouts should agree. Increasing only
 one timeout does not make an end-to-end request live longer if another layer
@@ -116,8 +101,7 @@ under [Queueing and backpressure](scaling.md#queueing-and-backpressure).
 | `WorkerHealth__Path`                | `/health/ready` | Worker endpoint polled by the API readiness check. Keep the default for the bundled Worker.                                                                                                                      |
 | `MICROBLINK_SHUTDOWN_GRACE_SECONDS` | `10`            | Seconds the supervisor waits after forwarding a termination signal before killing remaining service process groups. It must be a non-negative integer. Align the orchestrator termination grace period above it. |
 
-The supervisor treats the API, every Worker, and TensorFlow Serving when
-enabled as one unit. If any managed component exits unexpectedly, the
+The supervisor treats the API and every Worker as one unit. If any managed component exits unexpectedly, the
 supervisor stops the others and exits so Docker or Kubernetes can replace the
 whole instance. See the
 [Kubernetes probe configuration](kubernetes.md#access-the-api) and
@@ -134,7 +118,6 @@ whole instance. See the
 The optional files are:
 
 -   `/var/log/api.log`
--   `/var/log/tf-serving.log` in `ExtractAndVerify`
 -   `/var/log/worker-N.out.log`
 -   `/var/log/worker-N.err.log`
 
@@ -165,33 +148,24 @@ docker run -p 9090:8080 ...
 Several image-owned variables assume port `8080`, so changing only one internal
 port variable can disconnect the Workers from the API.
 
-## Bundled model-serving controls
+## Model execution
 
-These variables configure TensorFlow Serving and Worker readiness in
-`ExtractAndVerify`. The published image supplies working defaults. Change them
-only as part of a tested deployment-specific tuning exercise.
+The verification models run inside each Worker process. There is no separate
+model-serving container, no serving endpoint to point at, and no serving-side
+batching or thread-count variables to set: the runtime's own execution settings
+are fixed in the image so that results do not depend on deployment tuning.
 
-They do not apply to extraction-only deployments; see
+Earlier versions ran the models in a bundled TensorFlow Serving process and
+exposed variables to tune it and to choose how the Workers checked its
+readiness. Those variables no longer exist. Any of them left set in an existing
+deployment are ignored and can be removed.
+
+What governs model capacity now is the Worker count and the memory each Worker
+needs for its own copy of the models, described under
+[Workflow and capacity](#workflow-and-capacity) and
+[Sizing an instance](scaling.md#sizing-an-instance). Extraction-only deployments
+do not load the verification models at all; see
 [Deployment modes](deployment-modes.md#extraction).
-
-| Variable                             | Image default             | Role                                                                                                                                                        |
-| ------------------------------------ | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TF_SERVING_ENABLE_BATCHING`         | `1`                       | Enables TensorFlow Serving batching only when the value is exactly `1`.                                                                                     |
-| `TF_SERVING_BATCHING_CONFIG`         | `/models/batching.config` | Batching parameters passed to TensorFlow Serving when batching is enabled. The path must exist inside the container.                                        |
-| `TF_NUM_INTRAOP_THREADS`             | `4`                       | TensorFlow intra-operation thread count.                                                                                                                    |
-| `TF_NUM_INTEROP_THREADS`             | `2`                       | TensorFlow inter-operation thread count.                                                                                                                    |
-| `OMP_NUM_THREADS`                    | `4`                       | OpenMP thread count available to model-serving runtime libraries.                                                                                           |
-| `MODEL_SERVING_READINESS_MODE`       | `tensorflow-signature`    | Worker readiness method. The default verifies every configured model over the same gRPC serving path used for inference.                                    |
-| `MODEL_SERVING_READINESS_TIMEOUT_MS` | `1000`                    | Per-model readiness request timeout in milliseconds.                                                                                                        |
-| `TF_SERVING_READY_FILE`              | Unset                     | Optional path used with `tensorflow-ready-file` readiness. The launcher creates the file after TensorFlow Serving reports that model loading has completed. |
-
-The supported readiness-mode families are:
-
--   `tensorflow-signature`, the image default and strongest end-to-end check
--   `tensorflow-rest`, which checks each model through the REST status API
--   `tensorflow-ready-file`, which combines a startup marker file with a TCP
-    connection check
--   any other value, which falls back to a TCP connection check
 
 ## Image-owned variables
 
@@ -199,22 +173,23 @@ The image also sets or derives values that define its internal topology and
 runtime behavior. They are listed here to make the container contract explicit,
 but they are not deployment tuning controls.
 
-| Variable                         | Image value                                                      | Role                                                                                                                    |
-| -------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| `ASPNETCORE_URLS`                | `http://+:8080`                                                  | Binds the .NET API inside the container.                                                                                |
-| `API_PORT`                       | `8080`                                                           | Documents the internal API port used when the image is built. Changing it at runtime does not recalculate other values. |
-| `API_BASE_URL`                   | `http://localhost:8080`                                          | Internal queue endpoint used by Workers.                                                                                |
-| `RESOURCES_PATH`                 | `/app/res`                                                       | Bundled recognition-resource directory.                                                                                 |
-| `SCHEMA_PATH`                    | `/app/Backend/Schemas/document-verification-request.schema.json` | Bundled internal request schema used by Workers.                                                                        |
-| `DOTNET_gcServer`                | `1`                                                              | Enables server GC for the API process.                                                                                  |
-| `DOTNET_GCDynamicAdaptationMode` | `1`                                                              | Enables dynamic GC adaptation for changing container load.                                                              |
-| `DOTNET_GCConserveMemory`        | `1`                                                              | Biases the API GC toward conserving memory.                                                                             |
-| `DOTNET_GCRetainVM`              | `0`                                                              | Allows released GC segments to be returned to the operating system.                                                     |
-| `SSL_CERT_FILE`                  | `/etc/ssl/certs/ca-certificates.crt`                             | CA bundle used by native TLS clients.                                                                                   |
-| `CURL_CA_BUNDLE`                 | `/etc/ssl/certs/ca-certificates.crt`                             | CA bundle used by curl-compatible HTTP clients.                                                                         |
+| Variable                         | Image value                                                      | Role                                                                                                                        |
+| -------------------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `ASPNETCORE_URLS`                | `http://+:8080`                                                  | Binds the .NET API inside the container.                                                                                    |
+| `API_PORT`                       | `8080`                                                           | Documents the internal API port used when the image is built. Changing it at runtime does not recalculate other values.     |
+| `API_BASE_URL`                   | `http://localhost:8080`                                          | Internal queue endpoint used by Workers.                                                                                    |
+| `RESOURCES_PATH`                 | `/app/res`                                                       | Bundled recognition-resource directory.                                                                                     |
+| `SCHEMA_PATH`                    | `/app/Backend/Schemas/document-verification-request.schema.json` | Bundled internal request schema used by Workers.                                                                            |
+| `DOTNET_gcServer`                | `1`                                                              | Enables server GC for the API process.                                                                                      |
+| `DOTNET_GCDynamicAdaptationMode` | `1`                                                              | Enables dynamic GC adaptation for changing container load.                                                                  |
+| `DOTNET_GCConserveMemory`        | `1`                                                              | Biases the API GC toward conserving memory.                                                                                 |
+| `DOTNET_GCRetainVM`              | `0`                                                              | Allows released GC segments to be returned to the operating system.                                                         |
+| `DOCVER_ONNX_INTRAOP_THREADS`    | derived                                                          | Inference threads each Worker may use, derived as the container's CPU allocation divided by the Worker count, at least one. |
+| `SSL_CERT_FILE`                  | `/etc/ssl/certs/ca-certificates.crt`                             | CA bundle used by native TLS clients.                                                                                       |
+| `CURL_CA_BUNDLE`                 | `/etc/ssl/certs/ca-certificates.crt`                             | CA bundle used by curl-compatible HTTP clients.                                                                             |
 
 The Worker launcher derives `HEALTH_PORT` from `HEALTH_PORT_BASE` and assigns
-`WORKER_INDEX` from `0` through `WORKER_COUNT - 1` for each process. Values set
+`WORKER_INDEX` for the Worker process. Values set
 on the container for those two variables are overwritten.
 
 Changing `API_BASE_URL`, the bundled resource paths, or the internal serving

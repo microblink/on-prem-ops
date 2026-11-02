@@ -41,8 +41,8 @@ configured for extraction or barcode extraction without document verification:
 -   [`POST /api/v3/extract`](api-integration.md#document-extraction)
 -   [`POST /api/v3/extract-barcode`](api-integration.md#barcode-extraction)
 
-The model files remain in the image, but the server-side verification model
-service is not started. A request to `POST /api/v3/verify` returns HTTP `400`
+The model files remain in the image, but the Worker does not load the server-side
+verification models. A request to `POST /api/v3/verify` returns HTTP `400`
 because the endpoint is disabled in this mode.
 
 ```dotenv

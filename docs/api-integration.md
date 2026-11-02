@@ -39,9 +39,10 @@ technical input requirements. Consult our
 image quality for product performance.
 
 The configuration part is limited to 1 MiB, and the complete multipart body is
-limited to 76 MiB. Container admission and memory protection are described
-under
-[Memory and request limits](environment-variables.md#memory-and-request-limits).
+limited to 76 MiB. How many requests a container admits at once is described
+under [Workflow and capacity](environment-variables.md#workflow-and-capacity),
+and its memory requirement under
+[Memory limits](environment-variables.md#memory-limits).
 
 Use `GET /api/v3/schema.json` as the authoritative request and response
 contract. The runtime limits above apply in addition to what the OpenAPI schema
