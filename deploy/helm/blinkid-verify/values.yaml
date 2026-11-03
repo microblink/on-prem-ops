@@ -54,10 +54,11 @@ blinkIdVerify:
   # Supported customer configuration. See docs/environment-variables.md.
   env:
     DOCVER_WORKFLOW: ExtractAndVerify
-    WORKER_COUNT: "2"
-    MicroblinkInflightLimit: "2"
-    # The image defaults to 0. The chart uses 1 to absorb a short routing burst.
-    MicroblinkQueueLimit: "1"
+    # Both left to the image, which derives them from this pod's CPU and memory: the
+    # Worker count is min(cpu / 2, (memory - 700Mi) / 1000Mi) and the in-flight limit is
+    # one more than that. Pinning MicroblinkInflightLimit to 1 here used to strand the
+    # second Worker that 4 CPU and 8Gi now derives. Set them only to deviate deliberately.
+    MicroblinkQueueLimit: "2"
 
   logFiles:
     enabled: false
